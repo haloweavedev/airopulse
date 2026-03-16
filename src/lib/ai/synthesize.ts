@@ -30,8 +30,9 @@ export async function generateFeatures(
     .map((c) => `- ${c.name}${c.is_primary ? ' (primary)' : ''}: ${c.description || 'No description'}`)
     .join('\n');
 
+  // Use gpt-4.1 (not gpt-5.4) — faster for large structured output within Vercel 60s timeout
   const response = await openai.chat.completions.create({
-    model: MODELS.smart,
+    model: MODELS.worker === 'gpt-4.1-mini' ? 'gpt-4.1' : MODELS.smart,
     messages: [
       { role: 'system', content: GENERATE_FEATURES_PROMPT },
       {
@@ -39,7 +40,7 @@ export async function generateFeatures(
         content: `Product Summary:\n${productSummary}\n\n---\n\nCompetitors:\n${competitorList}\n\n---\n\nPain Points (${painPoints.length} total):\n\n${painPointsList}`,
       },
     ],
-    max_completion_tokens: 6000,
+    max_tokens: 8000,
     response_format: { type: 'json_object' },
   });
 

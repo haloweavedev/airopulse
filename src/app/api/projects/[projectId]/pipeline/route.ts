@@ -309,11 +309,11 @@ async function runGenerateFeatures(projectId: string) {
     return NextResponse.json({ error: 'No pain points to generate features from' }, { status: 400 });
   }
 
-  // Prioritize by intensity: critical > high > medium > low, cap at 50
+  // Prioritize by intensity: critical > high > medium > low, cap at 30 for Vercel timeout
   const intensityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
   const painPoints = [...allPainPoints]
     .sort((a, b) => (intensityOrder[a.intensity] ?? 3) - (intensityOrder[b.intensity] ?? 3))
-    .slice(0, 50);
+    .slice(0, 30);
 
   const competitors = await listCompetitors(projectId);
   const result = await generateFeatures(painPoints, competitors, project.product_summary!);
