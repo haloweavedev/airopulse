@@ -47,7 +47,7 @@ export function InsightCard({ insight }: { insight: Insight }) {
             &ldquo;{insight.evidence}&rdquo;
           </blockquote>
         )}
-        {insight.tags.length > 0 && (
+        {Array.isArray(insight.tags) && insight.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {insight.tags.map((tag) => (
               <Badge key={tag} variant="outline" className="text-[10px]">
