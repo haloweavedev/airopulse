@@ -48,31 +48,28 @@ export async function extractPainPoints(thread: {
 }, productSummary: string) {
   const openai = getOpenAI();
 
-  // Extract comments from thread JSON
+  // Extract comments from thread JSON (when available from Reddit API)
   const threadData = thread.thread_json as unknown as unknown[];
-  let comments: { author: string; body: string; score: number }[] = [];
+  let commentsText = '';
   if (Array.isArray(threadData) && threadData.length > 1) {
     const commentListing = threadData[1] as Record<string, unknown>;
     if (commentListing?.data && typeof commentListing.data === 'object') {
       const data = commentListing.data as Record<string, unknown>;
       if (Array.isArray(data.children)) {
-        comments = extractComments(data.children);
+        const comments = extractComments(data.children);
+        commentsText = comments
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 40)
+          .map((c) => `[score:${c.score}] ${c.body}`)
+          .join('\n---\n');
       }
     }
   }
 
-  const topComments = comments
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 40)
-    .map((c) => `[score:${c.score}] ${c.body}`)
-    .join('\n---\n');
-
   const threadContent = `## Thread: ${thread.title}
 Subreddit: r/${thread.subreddit} | Score: ${thread.score}
 Post: ${thread.selftext || '(link post)'}
-
-Top comments:
-${topComments}
+${commentsText ? `\nTop comments:\n${commentsText}` : ''}
 
 ---
 

@@ -1,4 +1,4 @@
-import { rateLimitedFetch } from './rate-limiter';
+import { getTavily } from '../tavily';
 
 export interface RedditSearchResult {
   reddit_id: string;
@@ -11,24 +11,36 @@ export interface RedditSearchResult {
   num_comments: number;
 }
 
-export async function searchReddit(query: string, limit = 25): Promise<RedditSearchResult[]> {
-  const url = `https://old.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}`;
-  const res = await rateLimitedFetch(url);
-  const data = await res.json();
+/**
+ * Search for Reddit threads using Tavily (reddit.com is 403 from Vercel IPs).
+ * Tavily provides the thread content directly — no need to fetch from Reddit.
+ */
+export async function searchReddit(query: string, limit = 10): Promise<RedditSearchResult[]> {
+  const tvly = getTavily();
 
-  const posts = (data?.data?.children || [])
-    .map((c: { data: Record<string, unknown> }) => c.data)
-    .filter((p: Record<string, unknown>) => (p.num_comments as number) > 3)
-    .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (b.num_comments as number) - (a.num_comments as number));
+  const response = await tvly.search(query, {
+    maxResults: limit,
+    searchDepth: 'advanced',
+    includeDomains: ['reddit.com'],
+  });
 
-  return posts.map((p: Record<string, unknown>) => ({
-    reddit_id: p.id as string,
-    subreddit: p.subreddit as string,
-    title: p.title as string,
-    selftext: (p.selftext as string) || '',
-    url: p.url as string,
-    permalink: p.permalink as string,
-    score: p.score as number,
-    num_comments: p.num_comments as number,
-  }));
+  const results: RedditSearchResult[] = [];
+
+  for (const r of response.results) {
+    const match = r.url.match(/reddit\.com(\/r\/(\w+)\/comments\/(\w+))/);
+    if (!match) continue;
+
+    results.push({
+      reddit_id: match[3],
+      subreddit: match[2],
+      title: r.title,
+      selftext: r.content || '',
+      url: r.url,
+      permalink: match[1],
+      score: 0,
+      num_comments: 0,
+    });
+  }
+
+  return results;
 }

@@ -13,7 +13,6 @@ import { generateRedditQueries } from '@/lib/ai/reddit-queries';
 import { extractPainPoints } from '@/lib/ai/analyze-thread';
 import { generateFeatures } from '@/lib/ai/synthesize';
 import { searchReddit } from '@/lib/reddit/search';
-import { fetchThreadJson } from '@/lib/reddit/fetch-thread';
 import { errorResponse } from '@/lib/api-error';
 
 export const maxDuration = 60;
@@ -159,11 +158,9 @@ async function runMine(projectId: string) {
   for (const q of activeQueries) {
     const results = await searchReddit(q.query);
 
-    // Fetch full thread data for top 5 per query
     const topResults = results.slice(0, 5);
     for (const post of topResults) {
       try {
-        const threadJson = await fetchThreadJson(post.permalink);
         await upsertThread({
           project_id: projectId,
           query_id: q.id,
@@ -175,11 +172,11 @@ async function runMine(projectId: string) {
           permalink: post.permalink,
           score: post.score,
           num_comments: post.num_comments,
-          thread_json: threadJson as Record<string, unknown>,
+          thread_json: {},
         });
         totalThreads++;
       } catch (err) {
-        console.error(`Failed to fetch thread ${post.permalink}:`, err);
+        console.error(`Failed to store thread ${post.permalink}:`, err);
       }
     }
 
