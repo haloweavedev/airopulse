@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getProject, updateProjectStatus } from '@/lib/db/projects';
 import { listDocuments } from '@/lib/db/documents';
-import { createCompetitor } from '@/lib/db/competitors';
+import { createCompetitor, listCompetitors } from '@/lib/db/competitors';
 import { createQuery, listQueries, updateQuery } from '@/lib/db/queries';
 import { upsertThread, getThreadsForAnalysis, updateThreadStatus } from '@/lib/db/threads';
 import { createInsight, listInsights } from '@/lib/db/insights';
+import { createFeature, deleteFeatures } from '@/lib/db/features';
 import { createPipelineRun, completePipelineRun } from '@/lib/db/pipeline';
 import { summarizeDocuments } from '@/lib/ai/summarize';
-import { identifyCompetitors } from '@/lib/ai/competitors';
-import { analyzeThread } from '@/lib/ai/analyze-thread';
-import { synthesizeReport } from '@/lib/ai/synthesize';
+import { researchCompetitors } from '@/lib/ai/competitors';
+import { generateRedditQueries } from '@/lib/ai/reddit-queries';
+import { extractPainPoints } from '@/lib/ai/analyze-thread';
+import { generateFeatures } from '@/lib/ai/synthesize';
 import { searchReddit } from '@/lib/reddit/search';
 import { fetchThreadJson } from '@/lib/reddit/fetch-thread';
 import { errorResponse } from '@/lib/api-error';
@@ -35,10 +37,12 @@ export async function POST(
         return await runCompetitors(projectId);
       case 'mine':
         return await runMine(projectId);
+      case 'pain_points':
       case 'analyze':
-        return await runAnalyze(projectId);
+        return await runExtractPainPoints(projectId);
+      case 'features':
       case 'synthesize':
-        return await runSynthesize(projectId);
+        return await runGenerateFeatures(projectId);
       default:
         return NextResponse.json({ error: `Unknown step: ${step}` }, { status: 400 });
     }
@@ -88,35 +92,49 @@ async function runCompetitors(projectId: string) {
     return NextResponse.json({ error: 'No product summary. Run summarize step first.' }, { status: 400 });
   }
 
-  const result = await identifyCompetitors(project.product_summary);
+  // Step 1-3: Generate search terms → Tavily search → Structure competitors
+  const result = await researchCompetitors(project.product_summary);
 
   for (const comp of result.competitors) {
     await createCompetitor({
       project_id: projectId,
       name: comp.name,
       description: comp.description,
-      website: comp.website,
+      website: comp.website ?? undefined,
+      source_url: comp.source_url,
       is_primary: comp.is_primary,
     });
   }
 
-  for (const q of result.queries) {
+  // Step 4: Generate Reddit queries using real competitor names
+  const storedCompetitors = await listCompetitors(projectId);
+  const queriesResult = await generateRedditQueries(project.product_summary, storedCompetitors);
+
+  for (const q of queriesResult.queries) {
     await createQuery({ project_id: projectId, query: q, source: 'ai' });
   }
+
+  const totalInputTokens = (result.usage.prompt_tokens ?? 0) + (queriesResult.usage?.prompt_tokens ?? 0);
+  const totalOutputTokens = (result.usage.completion_tokens ?? 0) + (queriesResult.usage?.completion_tokens ?? 0);
 
   // Pause after this step — user reviews competitors/queries
   await updateProjectStatus(projectId, 'draft');
   await completePipelineRun(run.id, {
     status: 'complete',
-    input_tokens: result.usage?.prompt_tokens ?? 0,
-    output_tokens: result.usage?.completion_tokens ?? 0,
+    input_tokens: totalInputTokens,
+    output_tokens: totalOutputTokens,
     duration_ms: Date.now() - start,
-    metadata: { competitors_count: result.competitors.length, queries_count: result.queries.length },
+    metadata: {
+      competitors_count: result.competitors.length,
+      queries_count: queriesResult.queries.length,
+      search_terms: result.searchTerms,
+      raw_results_count: result.rawResultsCount,
+    },
   });
 
   return NextResponse.json({
     competitors: result.competitors.length,
-    queries: result.queries.length,
+    queries: queriesResult.queries.length,
   });
 }
 
@@ -179,9 +197,9 @@ async function runMine(projectId: string) {
   return NextResponse.json({ threads_mined: totalThreads });
 }
 
-async function runAnalyze(projectId: string) {
-  await updateProjectStatus(projectId, 'analyzing');
-  const run = await createPipelineRun({ project_id: projectId, step: 'analyze', model_used: 'gpt-4.1-mini' });
+async function runExtractPainPoints(projectId: string) {
+  await updateProjectStatus(projectId, 'extracting_pain_points');
+  const run = await createPipelineRun({ project_id: projectId, step: 'pain_points', model_used: 'gpt-4.1-mini' });
   const start = Date.now();
 
   const project = await getProject(projectId);
@@ -203,7 +221,7 @@ async function runAnalyze(projectId: string) {
 
   for (const thread of threads) {
     try {
-      const result = await analyzeThread(
+      const result = await extractPainPoints(
         {
           title: thread.title,
           subreddit: thread.subreddit,
@@ -214,17 +232,26 @@ async function runAnalyze(projectId: string) {
         project.product_summary
       );
 
-      for (const insight of result.insights) {
+      for (const pp of result.painPoints) {
+        // Store who_feels_it as a tag prefixed with "who:"
+        const tags = [...pp.tags];
+        if (pp.who_feels_it) {
+          tags.push(`who:${pp.who_feels_it}`);
+        }
+        if (pp.competitor_mentioned) {
+          tags.push(`competitor:${pp.competitor_mentioned}`);
+        }
+
         await createInsight({
           project_id: projectId,
           thread_id: thread.id,
-          category: insight.category,
-          title: insight.title,
-          description: insight.description,
-          evidence: insight.evidence,
-          intensity: insight.intensity,
-          frequency: insight.frequency,
-          tags: insight.tags,
+          category: 'pain_point',
+          title: pp.title,
+          description: pp.description,
+          evidence: pp.evidence,
+          intensity: pp.intensity,
+          frequency: 1,
+          tags,
         });
         totalInsights++;
       }
@@ -233,7 +260,7 @@ async function runAnalyze(projectId: string) {
       totalOutputTokens += result.usage?.completion_tokens ?? 0;
       await updateThreadStatus(thread.id, 'analyzed');
     } catch (err) {
-      console.error(`Failed to analyze thread ${thread.id}:`, err);
+      console.error(`Failed to extract pain points from thread ${thread.id}:`, err);
       await updateThreadStatus(thread.id, 'error');
     }
   }
@@ -244,19 +271,19 @@ async function runAnalyze(projectId: string) {
     input_tokens: totalInputTokens,
     output_tokens: totalOutputTokens,
     duration_ms: Date.now() - start,
-    metadata: { threads_analyzed: threads.length, insights_extracted: totalInsights },
+    metadata: { threads_analyzed: threads.length, pain_points_extracted: totalInsights },
   });
 
   return NextResponse.json({
     threads_analyzed: threads.length,
-    insights_extracted: totalInsights,
+    pain_points_extracted: totalInsights,
     has_more: (await getThreadsForAnalysis(projectId, 1)).length > 0,
   });
 }
 
-async function runSynthesize(projectId: string) {
-  await updateProjectStatus(projectId, 'synthesizing');
-  const run = await createPipelineRun({ project_id: projectId, step: 'synthesize', model_used: 'gpt-4.1' });
+async function runGenerateFeatures(projectId: string) {
+  await updateProjectStatus(projectId, 'generating_features');
+  const run = await createPipelineRun({ project_id: projectId, step: 'features', model_used: 'gpt-4.1' });
   const start = Date.now();
 
   const project = await getProject(projectId);
@@ -265,14 +292,35 @@ async function runSynthesize(projectId: string) {
     return NextResponse.json({ error: 'No product summary' }, { status: 400 });
   }
 
-  const insights = await listInsights(projectId);
-  if (insights.length === 0) {
-    await completePipelineRun(run.id, { status: 'error', error_message: 'No insights to synthesize' });
-    await updateProjectStatus(projectId, 'draft', { error_message: 'No insights. Run analyze step first.' });
-    return NextResponse.json({ error: 'No insights to synthesize' }, { status: 400 });
+  const painPoints = await listInsights(projectId, { category: 'pain_point' });
+  if (painPoints.length === 0) {
+    await completePipelineRun(run.id, { status: 'error', error_message: 'No pain points to generate features from' });
+    await updateProjectStatus(projectId, 'draft', { error_message: 'No pain points. Run extract pain points step first.' });
+    return NextResponse.json({ error: 'No pain points to generate features from' }, { status: 400 });
   }
 
-  const result = await synthesizeReport(insights, project.product_summary);
+  const competitors = await listCompetitors(projectId);
+  const result = await generateFeatures(painPoints, competitors, project.product_summary);
+
+  // Clear old features before storing new ones
+  await deleteFeatures(projectId);
+
+  for (const f of result.features) {
+    // Map pain_point_indices to actual insight UUIDs
+    const painPointIds = (f.pain_point_indices || [])
+      .filter((idx: number) => idx >= 0 && idx < painPoints.length)
+      .map((idx: number) => painPoints[idx].id);
+
+    await createFeature({
+      project_id: projectId,
+      title: f.title,
+      description: f.description,
+      impact: f.impact,
+      effort: f.effort,
+      pain_point_ids: painPointIds,
+      evidence_summary: f.evidence_summary,
+    });
+  }
 
   await updateProjectStatus(projectId, 'complete', { final_report: result.report });
   await completePipelineRun(run.id, {
@@ -280,7 +328,11 @@ async function runSynthesize(projectId: string) {
     input_tokens: result.usage?.prompt_tokens ?? 0,
     output_tokens: result.usage?.completion_tokens ?? 0,
     duration_ms: Date.now() - start,
+    metadata: { features_generated: result.features.length },
   });
 
-  return NextResponse.json({ report: result.report });
+  return NextResponse.json({
+    features: result.features.length,
+    report: result.report,
+  });
 }

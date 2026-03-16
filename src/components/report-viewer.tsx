@@ -21,7 +21,7 @@ export function ReportViewer({ report }: { report: string }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'competitive-intelligence-report.md';
+    a.download = 'product-research-report.md';
     a.click();
     URL.revokeObjectURL(url);
   };

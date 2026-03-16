@@ -18,10 +18,23 @@ import { ReportViewer } from '@/components/report-viewer';
 import { EmptyState } from '@/components/empty-state';
 import {
   ArrowLeft, Play, Loader2, Trash2,
-  FileText, Users, Search, MessageSquare, Lightbulb, BookOpen,
+  FileText, Users, Search, MessageSquare, Lightbulb, BookOpen, Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Project, Document, Competitor, SearchQuery, RedditThread, Insight } from '@/lib/types';
+import type { Project, Document, Competitor, SearchQuery, RedditThread, Insight, Feature } from '@/lib/types';
+
+const IMPACT_COLORS: Record<string, string> = {
+  critical: 'bg-red-200 text-red-900',
+  high: 'bg-red-100 text-red-800',
+  medium: 'bg-yellow-100 text-yellow-800',
+  low: 'bg-slate-100 text-slate-700',
+};
+
+const EFFORT_COLORS: Record<string, string> = {
+  high: 'bg-orange-100 text-orange-800',
+  medium: 'bg-blue-100 text-blue-800',
+  low: 'bg-green-100 text-green-800',
+};
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = use(params);
@@ -32,6 +45,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const [queries, setQueries] = useState<SearchQuery[]>([]);
   const [threads, setThreads] = useState<RedditThread[]>([]);
   const [insights, setInsights] = useState<Insight[]>([]);
+  const [features, setFeatures] = useState<Feature[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [runningStep, setRunningStep] = useState('');
@@ -48,13 +62,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         } catch { return []; }
       };
 
-      const [p, d, c, q, t, i] = await Promise.all([
+      const [p, d, c, q, t, i, f] = await Promise.all([
         fetch(`/api/projects/${projectId}`).then(r => r.json()).catch(() => null),
         safeFetch(`/api/projects/${projectId}/documents`),
         safeFetch(`/api/projects/${projectId}/competitors`),
         safeFetch(`/api/projects/${projectId}/queries`),
         safeFetch(`/api/projects/${projectId}/threads`),
         safeFetch(`/api/projects/${projectId}/insights`),
+        safeFetch(`/api/projects/${projectId}/features`),
       ]);
 
       setProject(p);
@@ -63,6 +78,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
       setQueries(Array.isArray(q) ? q : []);
       setThreads(Array.isArray(t) ? t : []);
       setInsights(Array.isArray(i) ? i : []);
+      setFeatures(Array.isArray(f) ? f : []);
     } catch (err) {
       console.error('Failed to load project:', err);
     } finally {
@@ -101,8 +117,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         toast.error(data.error || 'Pipeline step failed');
       } else {
         toast.success(`${step} complete`);
-        if (step === 'analyze' && data.has_more) {
-          toast.info('More threads available — run analyze again');
+        if (step === 'pain_points' && data.has_more) {
+          toast.info('More threads available — run Extract Pain Points again');
         }
       }
       await loadAll();
@@ -139,17 +155,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const hasCompetitors = competitors.length > 0;
   const hasThreads = threads.length > 0;
   const hasInsights = insights.length > 0;
+  const hasFeatures = features.length > 0;
   const hasReport = !!project.final_report;
 
   const nextStep = !hasDocs ? null
     : !hasSummary ? 'summarize'
     : !hasCompetitors ? 'competitors'
     : !hasThreads ? 'mine'
-    : threads.some((t) => t.analysis_status === 'pending') ? 'analyze'
-    : !hasReport ? 'synthesize'
+    : threads.some((t) => t.analysis_status === 'pending') ? 'pain_points'
+    : !hasReport ? 'features'
     : null;
 
-  const isProcessing = ['summarizing', 'identifying_competitors', 'mining', 'analyzing', 'synthesizing'].includes(project.status);
+  const isProcessing = ['summarizing', 'identifying_competitors', 'mining', 'analyzing', 'extracting_pain_points', 'synthesizing', 'generating_features'].includes(project.status);
 
   return (
     <div className="flex flex-col gap-6">
@@ -220,9 +237,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
             <MessageSquare className="size-3.5" />
             Threads ({threads.length})
           </TabsTrigger>
-          <TabsTrigger value="insights" className="gap-1">
+          <TabsTrigger value="pain_points" className="gap-1">
             <Lightbulb className="size-3.5" />
-            Insights ({insights.length})
+            Pain Points ({insights.length})
+          </TabsTrigger>
+          <TabsTrigger value="features" className="gap-1">
+            <Zap className="size-3.5" />
+            Features ({features.length})
           </TabsTrigger>
           <TabsTrigger value="report" className="gap-1">
             <BookOpen className="size-3.5" />
@@ -231,7 +252,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         </TabsList>
 
         <TabsContent value="overview" className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-5">
             <Card>
               <CardHeader className="pb-1"><CardTitle className="text-xs text-muted-foreground">Documents</CardTitle></CardHeader>
               <CardContent><p className="text-2xl font-bold">{documents.length}</p></CardContent>
@@ -245,8 +266,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
               <CardContent><p className="text-2xl font-bold">{threads.length}</p></CardContent>
             </Card>
             <Card>
-              <CardHeader className="pb-1"><CardTitle className="text-xs text-muted-foreground">Insights</CardTitle></CardHeader>
+              <CardHeader className="pb-1"><CardTitle className="text-xs text-muted-foreground">Pain Points</CardTitle></CardHeader>
               <CardContent><p className="text-2xl font-bold">{insights.length}</p></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-1"><CardTitle className="text-xs text-muted-foreground">Features</CardTitle></CardHeader>
+              <CardContent><p className="text-2xl font-bold">{features.length}</p></CardContent>
             </Card>
           </div>
 
@@ -283,12 +308,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
           )}
         </TabsContent>
 
-        <TabsContent value="insights" className="flex flex-col gap-4">
+        <TabsContent value="pain_points" className="flex flex-col gap-4">
           {insights.length === 0 ? (
             <EmptyState
               icon={Lightbulb}
-              title="No insights yet"
-              description="Run the analyze step to extract insights from mined threads."
+              title="No pain points yet"
+              description="Run the Extract Pain Points step to find what hurts users in mined threads."
             />
           ) : (
             <>
@@ -307,12 +332,51 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
           )}
         </TabsContent>
 
+        <TabsContent value="features" className="flex flex-col gap-4">
+          {features.length === 0 ? (
+            <EmptyState
+              icon={Zap}
+              title="No features yet"
+              description="Run the Generate Features step to map pain points to actionable product features."
+            />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {features.map((feature) => (
+                <Card key={feature.id}>
+                  <CardHeader className="pb-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary" className={IMPACT_COLORS[feature.impact] || ''}>
+                        Impact: {feature.impact}
+                      </Badge>
+                      <Badge variant="secondary" className={EFFORT_COLORS[feature.effort] || ''}>
+                        Effort: {feature.effort}
+                      </Badge>
+                      {feature.pain_point_ids.length > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          {feature.pain_point_ids.length} pain point{feature.pain_point_ids.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-sm font-medium">{feature.title}</h4>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-2">
+                    <p className="text-sm text-muted-foreground">{feature.description}</p>
+                    {feature.evidence_summary && (
+                      <p className="text-xs text-muted-foreground/80 italic">{feature.evidence_summary}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
         <TabsContent value="report">
           {!project.final_report ? (
             <EmptyState
               icon={BookOpen}
               title="No report yet"
-              description="Run the synthesize step to generate a comprehensive competitive intelligence report."
+              description="Run the Generate Features step to produce a pain-point-driven product research report."
             />
           ) : (
             <ReportViewer report={project.final_report} />

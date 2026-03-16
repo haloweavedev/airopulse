@@ -4,7 +4,9 @@ export type ProjectStatus =
   | 'identifying_competitors'
   | 'mining'
   | 'analyzing'
+  | 'extracting_pain_points'
   | 'synthesizing'
+  | 'generating_features'
   | 'complete'
   | 'error';
 
@@ -16,9 +18,10 @@ export type InsightCategory =
   | 'switching_trigger'
   | 'opportunity'
   | 'validation'
-  | 'gap';
+  | 'gap'
+  | 'pain_point';
 
-export type InsightIntensity = 'low' | 'medium' | 'high';
+export type InsightIntensity = 'low' | 'medium' | 'high' | 'critical';
 
 export type AnalysisStatus = 'pending' | 'analyzed' | 'error';
 
@@ -52,6 +55,7 @@ export interface Competitor {
   name: string;
   description: string | null;
   website: string | null;
+  source_url: string | null;
   is_primary: boolean;
   created_at: string;
 }
@@ -114,6 +118,18 @@ export interface PipelineRun {
   created_at: string;
 }
 
+export interface Feature {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string;
+  impact: 'low' | 'medium' | 'high' | 'critical';
+  effort: 'low' | 'medium' | 'high';
+  pain_point_ids: string[];
+  evidence_summary: string;
+  created_at: string;
+}
+
 export interface ProjectWithCounts extends Project {
   document_count: number;
   insight_count: number;
@@ -122,10 +138,10 @@ export interface ProjectWithCounts extends Project {
 export const PIPELINE_STEPS = [
   { key: 'upload', label: 'Upload Documents', description: 'Upload product docs' },
   { key: 'summarize', label: 'Summarize', description: 'AI generates product summary' },
-  { key: 'competitors', label: 'Identify Competitors', description: 'AI identifies competitors & generates queries' },
+  { key: 'competitors', label: 'Research Competitors', description: 'AI discovers real competitors via web search' },
   { key: 'mine', label: 'Mine Reddit', description: 'Search & fetch Reddit threads' },
-  { key: 'analyze', label: 'Analyze Threads', description: 'AI extracts insights from threads' },
-  { key: 'synthesize', label: 'Synthesize Report', description: 'AI generates final report' },
+  { key: 'pain_points', label: 'Extract Pain Points', description: 'AI extracts pain points from threads' },
+  { key: 'features', label: 'Generate Features', description: 'AI maps pain points to actionable features' },
 ] as const;
 
 export type PipelineStep = typeof PIPELINE_STEPS[number]['key'];

@@ -1,14 +1,14 @@
 import { getOpenAI } from '../openai';
 import { MODELS } from './models';
-import { ANALYZE_THREAD_PROMPT } from './prompts';
+import { EXTRACT_PAIN_POINTS_PROMPT } from './prompts';
 
-interface ThreadInsight {
-  category: string;
+interface PainPoint {
   title: string;
   description: string;
-  evidence: string;
+  who_feels_it: string;
   intensity: string;
-  frequency: number;
+  evidence: string;
+  competitor_mentioned: string | null;
   tags: string[];
 }
 
@@ -39,7 +39,7 @@ function extractComments(commentTree: unknown[], depth = 0): { author: string; b
   return comments;
 }
 
-export async function analyzeThread(thread: {
+export async function extractPainPoints(thread: {
   title: string;
   subreddit: string;
   selftext: string | null;
@@ -82,19 +82,19 @@ ${productSummary}`;
   const response = await openai.chat.completions.create({
     model: MODELS.worker,
     messages: [
-      { role: 'system', content: ANALYZE_THREAD_PROMPT },
+      { role: 'system', content: EXTRACT_PAIN_POINTS_PROMPT },
       { role: 'user', content: threadContent },
     ],
     max_tokens: 3000,
     response_format: { type: 'json_object' },
   });
 
-  const content = response.choices[0].message.content ?? '{"insights":[]}';
+  const content = response.choices[0].message.content ?? '{"pain_points":[]}';
   const parsed = JSON.parse(content);
-  const insights: ThreadInsight[] = parsed.insights || [];
+  const painPoints: PainPoint[] = parsed.pain_points || [];
 
   return {
-    insights,
+    painPoints,
     usage: response.usage,
     model: MODELS.worker,
   };

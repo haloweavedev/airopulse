@@ -9,93 +9,124 @@ export const SUMMARIZE_PROMPT = `You are AiroPulse, a product research AI. You a
 
 Write in a clear, analytical style. Be specific — include feature names, workflows, and terminology from the documents. This summary will be used to identify competitors and generate search queries for competitive research.`;
 
-export const COMPETITORS_PROMPT = `You are AiroPulse, a product research AI. Based on the product summary and web research results below, identify the top competitors and generate Reddit search queries.
+export const SEARCH_TERMS_PROMPT = `You are AiroPulse, a product research AI. Given a product summary, generate web search terms to discover real competitors in this space.
 
-You may be provided with real web research data about competitors in this space. Use this to ground your analysis in reality — prioritize competitors that actually exist and are mentioned in the research. Do NOT hallucinate competitor names or websites.
+Return valid JSON:
+{
+  "search_terms": ["term 1", "term 2", ...]
+}
 
-Return your response as valid JSON with this exact structure:
+Guidelines:
+- Generate 5-8 search terms
+- Each term should surface competitors, alternatives, or market landscape info
+- Include the product category, target audience, and industry
+- Use terms like "alternatives to", "competitors", "best [category] software", "vs"
+- Be specific to the niche — avoid generic terms that would return unrelated results
+- Include terms that would surface both direct competitors and adjacent solutions`;
+
+export const STRUCTURE_COMPETITORS_PROMPT = `You are AiroPulse, a product research AI. You are given raw web search results about competitors in a specific market. Extract and structure the real competitors found in these results.
+
+Return valid JSON:
 {
   "competitors": [
     {
       "name": "Competitor Name",
-      "description": "What they do and how they compete",
-      "website": "https://example.com",
+      "description": "What they do and how they compete — based on the search results, not guesses",
+      "website": "https://example.com or null if not found",
+      "source_url": "URL of the search result where this competitor was found",
       "is_primary": true
     }
-  ],
-  "queries": [
-    "search query string"
   ]
 }
 
 Guidelines:
-- Identify 5-10 competitors (direct and indirect)
-- Mark 2-3 as primary (most directly competitive)
-- Only include competitors you are confident actually exist — prefer those confirmed by web research
-- Generate 10-15 Reddit search queries that would surface:
-  - Complaints about specific competitors by name
-  - Feature requests and wishlists in this exact product category
-  - Comparison/switching discussions between competitors
-  - Pain points in the problem space
-- Queries MUST be specific enough to find relevant Reddit threads. Include competitor names, specific product category terms, and the target industry/niche
-- Avoid generic queries that would match unrelated content`;
+- ONLY include competitors that actually appear in the search results — do NOT hallucinate or guess
+- Extract the competitor's actual website if mentioned in the results
+- Include source_url so findings are traceable
+- Mark 2-3 as primary (most directly competitive based on the evidence)
+- Include both direct and indirect competitors found in results
+- Deduplicate — if the same competitor appears in multiple results, merge the info
+- Write descriptions based on what the search results say, not assumptions`;
 
-export const ANALYZE_THREAD_PROMPT = `You are AiroPulse, a product research AI analyzing a Reddit thread for competitive insights.
+export const REDDIT_QUERIES_PROMPT = `You are AiroPulse, a product research AI. Given a product summary and a list of real competitors, generate Reddit search queries that will surface relevant discussions.
 
-Extract insights from this thread. Return valid JSON with this structure:
+Return valid JSON:
 {
-  "insights": [
+  "queries": ["query 1", "query 2", ...]
+}
+
+Guidelines:
+- Generate 8-12 Reddit search queries
+- Use ACTUAL competitor names from the list — e.g. "[CompetitorName] complaints", "[CompetitorName] vs [OtherCompetitor]"
+- Include queries about pain points in the specific product category
+- Include queries about switching between competitors
+- Include queries about the target industry's challenges with these types of tools
+- Be specific enough to avoid unrelated Reddit threads (politics, drama, etc.)
+- Include subreddit-specific terms if relevant (e.g. "dental practice management" not just "management software")`;
+
+export const EXTRACT_PAIN_POINTS_PROMPT = `You are AiroPulse, a product research AI analyzing a Reddit thread to extract pain points.
+
+Extract ONLY pain points — things that hurt, frustrate, or block users. Return valid JSON:
+{
+  "pain_points": [
     {
-      "category": "complaint|feature_request|switching_trigger|opportunity|validation|gap",
       "title": "Short descriptive title",
-      "description": "Detailed description of the insight",
-      "evidence": "Direct quote or paraphrase from the thread",
-      "intensity": "low|medium|high",
-      "frequency": 1,
+      "description": "What the pain point is and why it matters",
+      "who_feels_it": "Who experiences this pain (role, persona, or user type)",
+      "intensity": "low|medium|high|critical",
+      "evidence": "Direct quote or close paraphrase from the thread",
+      "competitor_mentioned": "Name of competitor mentioned, or null",
       "tags": ["tag1", "tag2"]
     }
   ]
 }
 
-Categories:
-- complaint: Things users hate about existing products
-- feature_request: Features users wish existed
-- switching_trigger: Reasons people switch between products
-- opportunity: Unmet needs or hacky workarounds
-- validation: Confirms value of features we already plan
-- gap: Things users want that we haven't considered
+Intensity scale:
+- low: Minor annoyance, workaround exists
+- medium: Regular frustration, impacts workflow
+- high: Significant pain, causes lost time/money
+- critical: Dealbreaker, causes people to switch products or abandon tasks
 
-Intensity: how strongly people feel (based on language, votes, agreement)
-Frequency: how many people in this thread express this sentiment (1-10 scale)
-Tags: relevant keywords for filtering
+Extract 2-8 pain points per thread. Be specific — cite actual comments. Only extract genuine pain points, not neutral observations or positive comments.`;
 
-Extract 3-10 insights per thread. Be specific — cite actual comments.`;
+export const GENERATE_FEATURES_PROMPT = `You are AiroPulse, a product research AI. You have extracted pain points from Reddit threads and identified real competitors. Now generate actionable product features that address these pain points.
 
-export const SYNTHESIZE_PROMPT = `You are AiroPulse, a product research AI. You have analyzed multiple Reddit threads and extracted individual insights. Now synthesize everything into a comprehensive competitive intelligence report.
+Return valid JSON:
+{
+  "features": [
+    {
+      "title": "Feature name",
+      "description": "What the feature does and how it solves the pain",
+      "impact": "low|medium|high|critical",
+      "effort": "low|medium|high",
+      "pain_point_indices": [0, 2, 5],
+      "evidence_summary": "Brief summary of the evidence supporting this feature"
+    }
+  ],
+  "report_markdown": "Full markdown report (see format below)"
+}
 
-Write the report in markdown with these sections:
+Feature guidelines:
+- Each feature should map to 1+ pain points via pain_point_indices (0-based index into the pain points list)
+- Impact = how much value this delivers (based on intensity and frequency of underlying pain points)
+- Effort = rough engineering effort (low = days, medium = weeks, high = months)
+- Generate 5-15 features, prioritized by impact/effort ratio
+- Be specific and actionable — not vague capabilities
 
-# Competitive Intelligence Report
+Report markdown format:
+# Product Research Report
 
 ## Executive Summary
-2-3 paragraph overview of key findings
+2-3 paragraphs: key findings, market landscape, biggest opportunities
 
-## Top Complaints About Competitors
-Ranked list of the most common/intense complaints. Include frequency data.
+## Pain Points by Severity
+Group pain points by intensity (critical → low), include evidence quotes
 
-## Feature Gaps & Opportunities
-What users want that doesn't exist yet. Prioritize by demand.
+## Recommended Features
+For each feature: what it does, which pain points it addresses, impact/effort, evidence
 
-## Switching Triggers
-What makes people leave one product for another. Key decision factors.
+## Competitive Landscape
+How competitors are failing users (based on pain points mentioning competitors)
 
-## Market Validation
-Which of our planned features directly address real user pain points.
-
-## Strategic Recommendations
-5-7 specific, actionable recommendations based on the research. Prioritize by impact.
-
-## Appendix: Insight Summary Table
-Markdown table summarizing all insights by category, intensity, and frequency.
-
-Be specific, data-driven, and actionable. Reference actual user quotes where impactful.`;
+## Priority Matrix
+Table of features sorted by impact/effort ratio with clear next steps`;

@@ -92,6 +92,25 @@ export async function migrate() {
     )
   `;
 
+  // Add source_url to competitors if missing
+  await sql`
+    ALTER TABLE competitors ADD COLUMN IF NOT EXISTS source_url TEXT
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS features (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      impact TEXT NOT NULL DEFAULT 'medium',
+      effort TEXT NOT NULL DEFAULT 'medium',
+      pain_point_ids UUID[] NOT NULL DEFAULT '{}',
+      evidence_summary TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+
   await sql`
     CREATE TABLE IF NOT EXISTS pipeline_runs (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -14,12 +14,13 @@ export async function createCompetitor(data: {
   name: string;
   description?: string;
   website?: string;
+  source_url?: string;
   is_primary?: boolean;
 }): Promise<Competitor> {
   const sql = getDb();
   const rows = await sql`
-    INSERT INTO competitors (project_id, name, description, website, is_primary)
-    VALUES (${data.project_id}, ${data.name}, ${data.description ?? null}, ${data.website ?? null}, ${data.is_primary ?? false})
+    INSERT INTO competitors (project_id, name, description, website, source_url, is_primary)
+    VALUES (${data.project_id}, ${data.name}, ${data.description ?? null}, ${data.website ?? null}, ${data.source_url ?? null}, ${data.is_primary ?? false})
     RETURNING *
   `;
   return rows[0] as Competitor;

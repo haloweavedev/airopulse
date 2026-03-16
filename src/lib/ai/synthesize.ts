@@ -1,29 +1,54 @@
 import { getOpenAI } from '../openai';
 import { MODELS } from './models';
-import { SYNTHESIZE_PROMPT } from './prompts';
-import type { Insight } from '../types';
+import { GENERATE_FEATURES_PROMPT } from './prompts';
+import type { Insight, Competitor } from '../types';
 
-export async function synthesizeReport(insights: Insight[], productSummary: string) {
+interface GeneratedFeature {
+  title: string;
+  description: string;
+  impact: string;
+  effort: string;
+  pain_point_indices: number[];
+  evidence_summary: string;
+}
+
+export async function generateFeatures(
+  painPoints: Insight[],
+  competitors: Competitor[],
+  productSummary: string
+) {
   const openai = getOpenAI();
 
-  const insightsSummary = insights
-    .map((i) => `[${i.category}] [${i.intensity}] (freq: ${i.frequency}) ${i.title}: ${i.description}${i.evidence ? `\n  Evidence: "${i.evidence}"` : ''}`)
+  const painPointsList = painPoints
+    .map((p, i) => {
+      const whoFeelsIt = p.tags.find((t) => t.startsWith('who:'))?.replace('who:', '') || 'unknown';
+      return `[${i}] [${p.intensity}] ${p.title}: ${p.description}${p.evidence ? `\n  Evidence: "${p.evidence}"` : ''}\n  Who: ${whoFeelsIt}`;
+    })
     .join('\n\n');
+
+  const competitorList = competitors
+    .map((c) => `- ${c.name}${c.is_primary ? ' (primary)' : ''}: ${c.description || 'No description'}`)
+    .join('\n');
 
   const response = await openai.chat.completions.create({
     model: MODELS.smart,
     messages: [
-      { role: 'system', content: SYNTHESIZE_PROMPT },
+      { role: 'system', content: GENERATE_FEATURES_PROMPT },
       {
         role: 'user',
-        content: `Product Summary:\n${productSummary}\n\n---\n\nAll Extracted Insights (${insights.length} total):\n\n${insightsSummary}`,
+        content: `Product Summary:\n${productSummary}\n\n---\n\nCompetitors:\n${competitorList}\n\n---\n\nPain Points (${painPoints.length} total):\n\n${painPointsList}`,
       },
     ],
     max_tokens: 6000,
+    response_format: { type: 'json_object' },
   });
 
+  const content = response.choices[0].message.content ?? '{"features":[],"report_markdown":""}';
+  const parsed = JSON.parse(content);
+
   return {
-    report: response.choices[0].message.content ?? '',
+    features: (parsed.features || []) as GeneratedFeature[],
+    report: (parsed.report_markdown || '') as string,
     usage: response.usage,
     model: MODELS.smart,
   };

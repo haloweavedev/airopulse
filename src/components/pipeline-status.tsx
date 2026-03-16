@@ -10,7 +10,9 @@ const STATUS_TO_STEP_INDEX: Record<string, number> = {
   identifying_competitors: 1,
   mining: 2,
   analyzing: 3,
+  extracting_pain_points: 3,
   synthesizing: 4,
+  generating_features: 4,
   complete: 5,
   error: -1,
 };

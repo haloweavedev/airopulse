@@ -11,12 +11,14 @@ const CATEGORY_COLORS: Record<string, string> = {
   opportunity: 'bg-emerald-100 text-emerald-800',
   validation: 'bg-purple-100 text-purple-800',
   gap: 'bg-orange-100 text-orange-800',
+  pain_point: 'bg-rose-100 text-rose-800',
 };
 
 const INTENSITY_COLORS: Record<string, string> = {
   low: 'bg-slate-100 text-slate-700',
   medium: 'bg-yellow-100 text-yellow-800',
   high: 'bg-red-100 text-red-800',
+  critical: 'bg-red-200 text-red-900',
 };
 
 export function InsightCard({ insight }: { insight: Insight }) {
