@@ -218,9 +218,10 @@ async function runExtractPainPoints(projectId: string) {
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
 
-  for (const thread of threads) {
-    try {
-      const result = await extractPainPoints(
+  // Process threads in parallel for speed
+  const results = await Promise.allSettled(
+    threads.map((thread) =>
+      extractPainPoints(
         {
           title: thread.title,
           subreddit: thread.subreddit,
@@ -228,39 +229,49 @@ async function runExtractPainPoints(projectId: string) {
           score: thread.score,
           thread_json: thread.thread_json,
         },
-        project.product_summary
-      );
+        project.product_summary!
+      ).then((result) => ({ thread, result }))
+    )
+  );
 
-      for (const pp of result.painPoints) {
-        // Store who_feels_it as a tag prefixed with "who:"
-        const tags = [...pp.tags];
-        if (pp.who_feels_it) {
-          tags.push(`who:${pp.who_feels_it}`);
-        }
-        if (pp.competitor_mentioned) {
-          tags.push(`competitor:${pp.competitor_mentioned}`);
-        }
+  for (const outcome of results) {
+    if (outcome.status === 'rejected') {
+      continue;
+    }
+    const { thread, result } = outcome.value;
 
-        await createInsight({
-          project_id: projectId,
-          thread_id: thread.id,
-          category: 'pain_point',
-          title: pp.title,
-          description: pp.description,
-          evidence: pp.evidence,
-          intensity: pp.intensity,
-          frequency: 1,
-          tags,
-        });
-        totalInsights++;
+    for (const pp of result.painPoints) {
+      const tags = [...pp.tags];
+      if (pp.who_feels_it) tags.push(`who:${pp.who_feels_it}`);
+      if (pp.competitor_mentioned) tags.push(`competitor:${pp.competitor_mentioned}`);
+
+      await createInsight({
+        project_id: projectId,
+        thread_id: thread.id,
+        category: 'pain_point',
+        title: pp.title,
+        description: pp.description,
+        evidence: pp.evidence,
+        intensity: pp.intensity,
+        frequency: 1,
+        tags,
+      });
+      totalInsights++;
+    }
+
+    totalInputTokens += result.usage?.prompt_tokens ?? 0;
+    totalOutputTokens += result.usage?.completion_tokens ?? 0;
+    await updateThreadStatus(thread.id, 'analyzed');
+  }
+
+  // Mark failed threads
+  for (const outcome of results) {
+    if (outcome.status === 'rejected') {
+      // Find the thread — we need to match by index
+      const idx = results.indexOf(outcome);
+      if (idx >= 0 && idx < threads.length) {
+        await updateThreadStatus(threads[idx].id, 'error');
       }
-
-      totalInputTokens += result.usage?.prompt_tokens ?? 0;
-      totalOutputTokens += result.usage?.completion_tokens ?? 0;
-      await updateThreadStatus(thread.id, 'analyzed');
-    } catch (err) {
-      console.error(`Failed to extract pain points from thread ${thread.id}:`, err);
-      await updateThreadStatus(thread.id, 'error');
     }
   }
 
