@@ -17,11 +17,12 @@ Return valid JSON:
 }
 
 Guidelines:
-- Generate 5-8 search terms
-- Each term should surface competitors, alternatives, or market landscape info
-- Include the product category, target audience, and industry
+- Generate 8-12 search terms
+- Mix TWO types of search terms:
+  1. Industry-specific terms (e.g. "best dental office training software")
+  2. General category terms (e.g. "best SOP software for teams", "employee onboarding platform alternatives", "Trainual alternatives")
+- The general terms are critical — many competitors are not industry-specific but compete directly on features (SOP management, team training, knowledge base, etc.)
 - Use terms like "alternatives to", "competitors", "best [category] software", "vs"
-- Be specific to the niche — avoid generic terms that would return unrelated results
 - Include terms that would surface both direct competitors and adjacent solutions`;
 
 export const STRUCTURE_COMPETITORS_PROMPT = `You are AiroPulse, a product research AI. You are given raw web search results about competitors in a specific market. Extract and structure the real competitors found in these results.
@@ -56,14 +57,15 @@ Return valid JSON:
 }
 
 Guidelines:
-- Generate 8-12 Reddit search queries
+- Generate 12-16 Reddit search queries
 - Do NOT include "site:reddit.com" or any URL prefixes — we handle Reddit scoping separately
+- Mix TWO types of queries:
+  1. **General competitor queries** (NO industry qualifier) — e.g. "Trainual complaints", "Whale vs Trainual", "SOP software frustrations", "onboarding platform problems". These surface universal pain points about the tools themselves.
+  2. **Industry-specific queries** — e.g. "dental office training software", "dental practice onboarding chaos". These surface domain-specific pain points.
+- Aim for roughly 60% general, 40% industry-specific
 - Use ACTUAL competitor names from the list — e.g. "[CompetitorName] complaints", "[CompetitorName] vs [OtherCompetitor]"
-- Include queries about pain points in the specific product category
 - Include queries about switching between competitors
-- Include queries about the target industry's challenges with these types of tools
-- Be specific enough to avoid unrelated Reddit threads (politics, drama, etc.)
-- Include subreddit-specific terms if relevant (e.g. "dental practice management" not just "management software")`;
+- Be specific enough to avoid unrelated Reddit threads (politics, drama, etc.)`;
 
 export const EXTRACT_PAIN_POINTS_PROMPT = `You are AiroPulse, a product research AI analyzing a Reddit thread to extract pain points.
 
