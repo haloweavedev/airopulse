@@ -85,7 +85,7 @@ ${productSummary}`;
       { role: 'system', content: EXTRACT_PAIN_POINTS_PROMPT },
       { role: 'user', content: threadContent },
     ],
-    max_tokens: 3000,
+    max_completion_tokens: 3000,
     response_format: { type: 'json_object' },
   });
 

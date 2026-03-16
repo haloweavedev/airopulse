@@ -15,7 +15,7 @@ export async function summarizeDocuments(documents: { name: string; raw_text: st
       { role: 'system', content: SUMMARIZE_PROMPT },
       { role: 'user', content: docTexts },
     ],
-    max_tokens: 4000,
+    max_completion_tokens: 4000,
   });
 
   return {

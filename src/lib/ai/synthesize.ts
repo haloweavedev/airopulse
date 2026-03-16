@@ -39,7 +39,7 @@ export async function generateFeatures(
         content: `Product Summary:\n${productSummary}\n\n---\n\nCompetitors:\n${competitorList}\n\n---\n\nPain Points (${painPoints.length} total):\n\n${painPointsList}`,
       },
     ],
-    max_tokens: 6000,
+    max_completion_tokens: 6000,
     response_format: { type: 'json_object' },
   });
 

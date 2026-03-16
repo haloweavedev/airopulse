@@ -22,7 +22,7 @@ export async function generateRedditQueries(
         content: `Product Summary:\n${productSummary}\n\n---\n\nReal Competitors:\n${competitorList}`,
       },
     ],
-    max_tokens: 2000,
+    max_completion_tokens: 2000,
     response_format: { type: 'json_object' },
   });
 

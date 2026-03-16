@@ -26,7 +26,7 @@ async function generateSearchTerms(summary: string) {
       { role: 'system', content: SEARCH_TERMS_PROMPT },
       { role: 'user', content: summary },
     ],
-    max_tokens: 1000,
+    max_completion_tokens: 1000,
     response_format: { type: 'json_object' },
   });
 
@@ -80,7 +80,7 @@ async function structureCompetitors(summary: string, rawResults: TavilyResult[])
         content: `Product Summary:\n${summary}\n\n---\n\nWeb Search Results:\n\n${resultsText}`,
       },
     ],
-    max_tokens: 3000,
+    max_completion_tokens: 3000,
     response_format: { type: 'json_object' },
   });
 
