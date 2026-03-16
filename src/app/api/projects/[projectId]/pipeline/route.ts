@@ -207,7 +207,7 @@ async function runExtractPainPoints(projectId: string) {
     return NextResponse.json({ error: 'No product summary' }, { status: 400 });
   }
 
-  const threads = await getThreadsForAnalysis(projectId, 10);
+  const threads = await getThreadsForAnalysis(projectId, 5);
   if (threads.length === 0) {
     await completePipelineRun(run.id, { status: 'complete', duration_ms: Date.now() - start, metadata: { message: 'No pending threads' } });
     await updateProjectStatus(projectId, 'draft');
