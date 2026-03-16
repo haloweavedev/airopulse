@@ -106,7 +106,7 @@ Return valid JSON:
       "evidence_summary": "Brief summary of the evidence supporting this feature"
     }
   ],
-  "report_markdown": "Full markdown report (see format below)"
+  "executive_summary": "2-3 paragraph overview of key findings, market landscape, and biggest opportunities"
 }
 
 Feature guidelines:
@@ -115,21 +115,4 @@ Feature guidelines:
 - Effort = rough engineering effort (low = days, medium = weeks, high = months)
 - Generate 5-15 features, prioritized by impact/effort ratio
 - Be specific and actionable — not vague capabilities
-
-Report markdown format:
-# Product Research Report
-
-## Executive Summary
-2-3 paragraphs: key findings, market landscape, biggest opportunities
-
-## Pain Points by Severity
-Group pain points by intensity (critical → low), include evidence quotes
-
-## Recommended Features
-For each feature: what it does, which pain points it addresses, impact/effort, evidence
-
-## Competitive Landscape
-How competitors are failing users (based on pain points mentioning competitors)
-
-## Priority Matrix
-Table of features sorted by impact/effort ratio with clear next steps`;
+- The executive_summary should be concise but insightful — this is the key takeaway for stakeholders`;
