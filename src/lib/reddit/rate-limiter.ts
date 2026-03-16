@@ -1,5 +1,5 @@
 let lastRequestTime = 0;
-const MIN_INTERVAL_MS = 300;
+const MIN_INTERVAL_MS = 600;
 
 export async function rateLimitedFetch(url: string): Promise<Response> {
   const now = Date.now();

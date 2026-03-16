@@ -146,39 +146,21 @@ async function runMine(projectId: string) {
   const start = Date.now();
 
   const queries = await listQueries(projectId);
-  // Only process queries that haven't been searched yet (batch 4 at a time for Vercel timeout)
-  const unsearchedQueries = queries.filter((q) => q.is_active && !q.last_searched);
-  const batch = unsearchedQueries.slice(0, 4);
+  const activeQueries = queries.filter((q) => q.is_active);
 
-  if (batch.length === 0) {
-    const activeQueries = queries.filter((q) => q.is_active);
-    if (activeQueries.length === 0) {
-      await completePipelineRun(run.id, { status: 'error', error_message: 'No active queries' });
-      await updateProjectStatus(projectId, 'draft', { error_message: 'No active search queries' });
-      return NextResponse.json({ error: 'No active search queries' }, { status: 400 });
-    }
-    await completePipelineRun(run.id, { status: 'complete', duration_ms: Date.now() - start, metadata: { message: 'All queries already searched' } });
-    await updateProjectStatus(projectId, 'draft');
-    return NextResponse.json({ threads_mined: 0, message: 'All queries already searched' });
+  if (activeQueries.length === 0) {
+    await completePipelineRun(run.id, { status: 'error', error_message: 'No active queries' });
+    await updateProjectStatus(projectId, 'draft', { error_message: 'No active search queries' });
+    return NextResponse.json({ error: 'No active search queries' }, { status: 400 });
   }
 
   let totalThreads = 0;
-  const queryErrors: string[] = [];
 
-  for (const q of batch) {
-    let results;
-    try {
-      results = await searchReddit(q.query);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      queryErrors.push(`"${q.query}": ${msg}`);
-      console.error(`searchReddit failed for "${q.query}":`, msg);
-      await updateQuery(q.id, { last_searched: new Date().toISOString() });
-      continue;
-    }
+  for (const q of activeQueries) {
+    const results = await searchReddit(q.query);
 
-    // Fetch full thread data for top 3 per query (reduced for speed)
-    const topResults = results.slice(0, 3);
+    // Fetch full thread data for top 5 per query
+    const topResults = results.slice(0, 5);
     for (const post of topResults) {
       try {
         const threadJson = await fetchThreadJson(post.permalink);
@@ -207,25 +189,14 @@ async function runMine(projectId: string) {
     });
   }
 
-  const hasMore = unsearchedQueries.length > batch.length;
-
   await updateProjectStatus(projectId, 'draft');
   await completePipelineRun(run.id, {
     status: 'complete',
     duration_ms: Date.now() - start,
-    metadata: {
-      total_threads: totalThreads,
-      queries_searched: batch.length,
-      queries_remaining: unsearchedQueries.length - batch.length,
-      query_errors: queryErrors.length > 0 ? queryErrors : undefined,
-    },
+    metadata: { total_threads: totalThreads, queries_searched: activeQueries.length },
   });
 
-  return NextResponse.json({
-    threads_mined: totalThreads,
-    has_more: hasMore,
-    ...(queryErrors.length > 0 && { query_errors: queryErrors }),
-  });
+  return NextResponse.json({ threads_mined: totalThreads });
 }
 
 async function runExtractPainPoints(projectId: string) {
