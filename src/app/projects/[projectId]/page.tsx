@@ -117,8 +117,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         toast.error(data.error || 'Pipeline step failed');
       } else {
         toast.success(`${step} complete`);
-        if (step === 'pain_points' && data.has_more) {
-          toast.info('More threads available — run Extract Pain Points again');
+        if (data.has_more) {
+          toast.info(`More ${step === 'mine' ? 'queries' : 'threads'} available — run again`);
         }
       }
       await loadAll();
@@ -158,10 +158,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const hasFeatures = features.length > 0;
   const hasReport = !!project.final_report;
 
+  const hasUnsearchedQueries = queries.some((q) => q.is_active && !q.last_searched);
   const nextStep = !hasDocs ? null
     : !hasSummary ? 'summarize'
     : !hasCompetitors ? 'competitors'
-    : !hasThreads ? 'mine'
+    : (!hasThreads || hasUnsearchedQueries) ? 'mine'
     : threads.some((t) => t.analysis_status === 'pending') ? 'pain_points'
     : !hasReport ? 'features'
     : null;
