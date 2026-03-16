@@ -57,6 +57,7 @@ Return valid JSON:
 
 Guidelines:
 - Generate 8-12 Reddit search queries
+- Do NOT include "site:reddit.com" or any URL prefixes — we handle Reddit scoping separately
 - Use ACTUAL competitor names from the list — e.g. "[CompetitorName] complaints", "[CompetitorName] vs [OtherCompetitor]"
 - Include queries about pain points in the specific product category
 - Include queries about switching between competitors
