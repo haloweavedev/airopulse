@@ -302,15 +302,21 @@ async function runGenerateFeatures(projectId: string) {
     return NextResponse.json({ error: 'No product summary' }, { status: 400 });
   }
 
-  const painPoints = await listInsights(projectId, { category: 'pain_point' });
-  if (painPoints.length === 0) {
+  const allPainPoints = await listInsights(projectId, { category: 'pain_point' });
+  if (allPainPoints.length === 0) {
     await completePipelineRun(run.id, { status: 'error', error_message: 'No pain points to generate features from' });
     await updateProjectStatus(projectId, 'draft', { error_message: 'No pain points. Run extract pain points step first.' });
     return NextResponse.json({ error: 'No pain points to generate features from' }, { status: 400 });
   }
 
+  // Prioritize by intensity: critical > high > medium > low, cap at 50
+  const intensityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+  const painPoints = [...allPainPoints]
+    .sort((a, b) => (intensityOrder[a.intensity] ?? 3) - (intensityOrder[b.intensity] ?? 3))
+    .slice(0, 50);
+
   const competitors = await listCompetitors(projectId);
-  const result = await generateFeatures(painPoints, competitors, project.product_summary);
+  const result = await generateFeatures(painPoints, competitors, project.product_summary!);
 
   // Clear old features before storing new ones
   await deleteFeatures(projectId);
