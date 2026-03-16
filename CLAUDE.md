@@ -32,6 +32,7 @@ No test framework is configured. Database migrations run via `POST /api/migrate`
 Defined in `.env.local` (never committed):
 - `OPENAI_API_KEY` — OpenAI authentication
 - `DATABASE_URL` — Neon PostgreSQL connection string
+- `TAVILY_API_KEY` — Tavily web search (used for competitor research and Reddit thread discovery)
 
 ## Architecture
 

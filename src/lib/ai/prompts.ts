@@ -9,7 +9,9 @@ export const SUMMARIZE_PROMPT = `You are AiroPulse, a product research AI. You a
 
 Write in a clear, analytical style. Be specific — include feature names, workflows, and terminology from the documents. This summary will be used to identify competitors and generate search queries for competitive research.`;
 
-export const COMPETITORS_PROMPT = `You are AiroPulse, a product research AI. Based on the product summary below, identify the top competitors and generate Reddit search queries.
+export const COMPETITORS_PROMPT = `You are AiroPulse, a product research AI. Based on the product summary and web research results below, identify the top competitors and generate Reddit search queries.
+
+You may be provided with real web research data about competitors in this space. Use this to ground your analysis in reality — prioritize competitors that actually exist and are mentioned in the research. Do NOT hallucinate competitor names or websites.
 
 Return your response as valid JSON with this exact structure:
 {
@@ -29,13 +31,14 @@ Return your response as valid JSON with this exact structure:
 Guidelines:
 - Identify 5-10 competitors (direct and indirect)
 - Mark 2-3 as primary (most directly competitive)
-- Generate 10-15 search queries that would surface:
-  - Complaints about competitors
-  - Feature requests and wishlists
-  - Comparison/switching discussions
+- Only include competitors you are confident actually exist — prefer those confirmed by web research
+- Generate 10-15 Reddit search queries that would surface:
+  - Complaints about specific competitors by name
+  - Feature requests and wishlists in this exact product category
+  - Comparison/switching discussions between competitors
   - Pain points in the problem space
-- Queries should include competitor names, category terms, and problem-focused phrases
-- Mix broad and specific queries`;
+- Queries MUST be specific enough to find relevant Reddit threads. Include competitor names, specific product category terms, and the target industry/niche
+- Avoid generic queries that would match unrelated content`;
 
 export const ANALYZE_THREAD_PROMPT = `You are AiroPulse, a product research AI analyzing a Reddit thread for competitive insights.
 
