@@ -16,6 +16,8 @@ import { searchReddit } from '@/lib/reddit/search';
 import { fetchThreadJson } from '@/lib/reddit/fetch-thread';
 import { errorResponse } from '@/lib/api-error';
 
+export const maxDuration = 60;
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ projectId: string }> }
@@ -153,9 +155,18 @@ async function runMine(projectId: string) {
   }
 
   let totalThreads = 0;
+  const queryErrors: string[] = [];
 
   for (const q of activeQueries) {
-    const results = await searchReddit(q.query);
+    let results;
+    try {
+      results = await searchReddit(q.query);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      queryErrors.push(`"${q.query}": ${msg}`);
+      console.error(`searchReddit failed for "${q.query}":`, msg);
+      continue;
+    }
 
     // Fetch full thread data for top 5 per query
     const topResults = results.slice(0, 5);
@@ -191,10 +202,17 @@ async function runMine(projectId: string) {
   await completePipelineRun(run.id, {
     status: 'complete',
     duration_ms: Date.now() - start,
-    metadata: { total_threads: totalThreads, queries_searched: activeQueries.length },
+    metadata: {
+      total_threads: totalThreads,
+      queries_searched: activeQueries.length,
+      query_errors: queryErrors.length > 0 ? queryErrors : undefined,
+    },
   });
 
-  return NextResponse.json({ threads_mined: totalThreads });
+  return NextResponse.json({
+    threads_mined: totalThreads,
+    ...(queryErrors.length > 0 && { query_errors: queryErrors }),
+  });
 }
 
 async function runExtractPainPoints(projectId: string) {
