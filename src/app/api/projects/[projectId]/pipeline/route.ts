@@ -139,8 +139,8 @@ async function runMine(projectId: string) {
   for (const q of activeQueries) {
     const results = await searchReddit(q.query);
 
-    // Fetch full thread data for top 10 per query
-    const topResults = results.slice(0, 10);
+    // Fetch full thread data for top 5 per query
+    const topResults = results.slice(0, 5);
     for (const post of topResults) {
       try {
         const threadJson = await fetchThreadJson(post.permalink);
