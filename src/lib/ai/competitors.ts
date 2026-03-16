@@ -43,6 +43,7 @@ async function searchForCompetitors(terms: string[]): Promise<TavilyResult[]> {
   const tvly = getTavily();
   const seen = new Set<string>();
   const results: TavilyResult[] = [];
+  const errors: string[] = [];
 
   for (const term of terms) {
     try {
@@ -57,8 +58,14 @@ async function searchForCompetitors(terms: string[]): Promise<TavilyResult[]> {
         }
       }
     } catch (err) {
-      console.error(`Tavily search failed for "${term}":`, err);
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`"${term}": ${msg}`);
+      console.error(`Tavily search failed for "${term}":`, msg);
     }
+  }
+
+  if (results.length === 0 && errors.length > 0) {
+    throw new Error(`All Tavily searches failed (${errors.length}/${terms.length}). First error: ${errors[0]}`);
   }
 
   return results;

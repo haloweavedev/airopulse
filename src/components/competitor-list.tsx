@@ -86,10 +86,21 @@ export function CompetitorList({
               </button>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{comp.name}</span>
+                  {comp.website ? (
+                    <a href={comp.website} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary underline-offset-2 hover:underline">
+                      {comp.name}
+                    </a>
+                  ) : (
+                    <span className="text-sm font-medium">{comp.name}</span>
+                  )}
                   {comp.is_primary && <Badge variant="secondary" className="text-[10px]">Primary</Badge>}
                 </div>
                 {comp.description && <p className="text-xs text-muted-foreground">{comp.description}</p>}
+                {comp.source_url && (
+                  <a href={comp.source_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground">
+                    source
+                  </a>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-1">
