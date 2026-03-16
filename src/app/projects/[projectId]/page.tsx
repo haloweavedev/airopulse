@@ -40,17 +40,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
 
   const loadAll = useCallback(async () => {
     try {
-      const [pRes, dRes, cRes, qRes, tRes, iRes] = await Promise.all([
-        fetch(`/api/projects/${projectId}`),
-        fetch(`/api/projects/${projectId}/documents`),
-        fetch(`/api/projects/${projectId}/competitors`),
-        fetch(`/api/projects/${projectId}/queries`),
-        fetch(`/api/projects/${projectId}/threads`),
-        fetch(`/api/projects/${projectId}/insights`),
-      ]);
+      const safeFetch = async (url: string) => {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return [];
+          return await res.json();
+        } catch { return []; }
+      };
 
       const [p, d, c, q, t, i] = await Promise.all([
-        pRes.json(), dRes.json(), cRes.json(), qRes.json(), tRes.json(), iRes.json(),
+        fetch(`/api/projects/${projectId}`).then(r => r.json()).catch(() => null),
+        safeFetch(`/api/projects/${projectId}/documents`),
+        safeFetch(`/api/projects/${projectId}/competitors`),
+        safeFetch(`/api/projects/${projectId}/queries`),
+        safeFetch(`/api/projects/${projectId}/threads`),
+        safeFetch(`/api/projects/${projectId}/insights`),
       ]);
 
       setProject(p);
